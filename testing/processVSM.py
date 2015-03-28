@@ -2,17 +2,29 @@
 # -*- coding: utf-8 -*-
 
 """
-    Programme de lancement de analyseVSM.py, sous forme de module
+    Programme de lancement du module «AnalyseVSM».
+    Le module 'AnalyseVSM' définit l'ensemble des fonctions.
+    Le script 'processVSM.py' est à placer, par ex., dans le dossier à analyser. Il sert à définir l'ensemble des variable nécessaires à l'analyse.
+
+    Usage : 'data/' est le dossier contenant les cycles du VSM.
+        -> python processVSM.py data/
 """
 
-# On commence par importer le module d'analyse
+####################
+# Importation «AnalyseVSM»
+####################
+## Si le module n'est pas installé (path python), on lui directement le chemin
+module_path = '/Users/zorg/These/Documents/Programmes/Python_Modules/'
+import sys
+sys.path.append(module_path)
 
-
-from analyseVSM import *
+# on peut alors l'importer
+from AnalyseVSM import *
 
 ####################
 # Varibles / Constantes
 ####################
+# Ces variables permette de définir le comportement des méthodes.
 # Physique
 mu_0 = 4*np.pi*1e-7 #H/m
 
@@ -29,16 +41,27 @@ n_Hsat = 20     # nombre de points utilisé pour déterminer la pente
 dos_plot = "pdf"
 dos_export = "xdat"
 
-# Condition d'analyse
+####################
+# Analy
+####################
+# Centrage de Ml et Mt.
 centrer = True
-rotation = True
 
-# Analyse rotation#
+
+####################
+# Varibles / Constantes
+####################
+# Permet de tracer la rotation. L'analyse prend alors en compte les angles selon le prefix et le suffix, et n'analyse pas les autres fichiers.
 # ex : fichier_001deg_n1.dat
 #   -> prefix = "*chier_"
 #   -> suffix "_n*"
+rotation = True
 prefix = "rot_"
 suffix = "deg_"
 file_rotation = 'rotation'
 
+
+####################
+# Lancement du programme
+####################
 run()
