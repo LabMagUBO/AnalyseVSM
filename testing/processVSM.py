@@ -64,4 +64,4 @@ file_rotation = 'rotation'
 ####################
 # Lancement du programme
 ####################
-run()
+run_analyse()

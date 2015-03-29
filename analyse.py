@@ -20,6 +20,11 @@
 
     Variables :
         dosOut
+
+
+
+    Fonctionnalité à implémenter :
+        - soustraire le signal de la canne
 """
 
 
@@ -216,30 +221,49 @@ def center_data(H, Mt, Ml, nb):
     logger.info("Mt base = {}".format(Mt_moy))
     return Mt - Mt_moy, Ml - (Ml_max + Ml_min) / 2, Ms
 
-def search_HcHe(H, M):
+def inspect_data(H, Mt, Ml):
     """
-        Calcul de Hc et He, en fonction d'un tableau de données.
+        Calcule, en fonction des données :
+            — Hc1, Hc2 : champs coercitifs
+            — Mr1, Mr2 : aimantation  rémanentes
+            — max(|Mt|) (aller et retour)
         H représente le champ, M le moment
         Les zéros sont déterminés par régression linéaire
 
         Retourne :
             — H_coer : deux champ coercitifs (gauche, droite)
-            — n_coer : indices correspondants pour les tableaux H ou M
+            — Mr     : aimantations rémanentes
+            — Mt_max : max de transverse
     """
     # Le tableau des champs coercitif : le 1 est celui de droite, le 0 celui de gauche
     H_coer = np.zeros(2)
     n_coer = np.zeros(2)
+    Mr = np.zeros(2)
+    Mt_max = np.zeros(2)
 
     # Signe initial de l'aimantation
-    signe = (M[0] > 0)
+    signe_Ml = (Ml[0] > 0)
+    signe_H = (H[0] > 0)
+
     # Boucle sur les données
     for i in np.arange(1,H.size):
-        if (M[i] > 0) != signe:
-            signe = not signe
-            H_coer[signe] = H[i-1] - (H[i] - H[i-1])/(M[i] - M[i-1]) * M[i-1]
-            n_coer[signe] = i
+        # si changement de signe le Ml -> champ coercitif
+        if (Ml[i] > 0) != signe_Ml:
+            signe_Ml = not signe_Ml
+            H_coer[signe_Ml] = H[i-1] - (H[i] - H[i-1])/(Ml[i] - Ml[i-1]) * Ml[i-1]
+            n_coer[signe_Ml] = i
 
-    return H_coer, n_coer
+        # si le champ change de signe -> aimantation rémanente
+        if (H[i] > 0) != signe_H:
+            signe_H = not signe_H
+            Mr[signe_H] = Ml[i-1] - (Ml[i] - Ml[i-1])/(H[i] - H[i-1]) * H[i-1]
+
+    # Calcul du maximum, aller retour (doit être symétrique)
+    demi = H.size / 2
+    Mt_max[0] = np.amax(np.absolute(Mt[0:demi]))
+    Mt_max[1] = np.amax(np.absolute(Mt[demi:]))
+
+    return H_coer, Mr, Mt_max
 
 def trace_cycle(H, Mt, Ml, H_coer, nom):
     """
@@ -284,6 +308,9 @@ def trace_cycle(H, Mt, Ml, H_coer, nom):
     logger.info("Exportation du tracé : {}".format(file_plot))
     pl.savefig(file_plot, dpi=100)
 
+    # Pas oublier de fermer la figure (libère la mémoire)
+    pl.close(fig)
+
 def trace_rotation(data, nom):
     """
         Trace l'évolution azimutal de data.
@@ -300,24 +327,24 @@ def trace_rotation(data, nom):
     ex.plot(np.radians(data[:, 0]), np.abs((data[:, 1]+data[:,2])/2), 'bo-', label='He (Oe)')
     ex.legend()
 
-    """
-    trans = fig.add_subplot(223, polar = True)
-    trans.grid(True)
-    trans.plot(np.radians(rotation[:, 0]), np.abs(rotation[:, 3]), 'go-', label='min(Mt) (A m**2)')
-    trans.plot(np.radians(rotation[:, 0]), np.abs(rotation[:, 4]), 'yo-', label='max(Mt) (A m**2)')
-    trans.legend()
-
     rem = fig.add_subplot(224, polar = True)
     rem.grid(True)
-    rem.plot(np.radians(rotation[:,0]), np.abs(rotation[:, 5]), 'mo-', label='Mr_1 (A m**2)')
-    rem.plot(np.radians(rotation[:,0]), np.abs(rotation[:, 6]), 'co-', label='Mr_2 (A m**2)')
+    rem.plot(np.radians(data[:,0]), np.abs(data[:, 4] / data[:, 3]), 'mo-', label='Mr_1 / Ms')
+    rem.plot(np.radians(data[:,0]), np.abs(data[:, 5] / data[:, 3]), 'co-', label='Mr_2 / Ms')
     rem.legend()
-    """
+
+    trans = fig.add_subplot(223, polar = True)
+    trans.grid(True)
+    trans.plot(np.radians(data[:, 0]), np.abs(data[:, 6] / data[:, 3]), 'go-', label='min(Mt) (A m**2)')
+    trans.plot(np.radians(data[:, 0]), np.abs(data[:, 7] / data[:, 3]), 'yo-', label='max(Mt) (A m**2)')
+    trans.legend()
 
     #On trace en exportant
     file_plot = "{0}/{1}.pdf".format(dos_plot, nom)
     logger.info("Exportation du tracé azimutal : {}".format(file_plot))
     pl.savefig(file_plot, dpi=100)
+
+    pl.close(fig)
 
 
 def analyse_file(folder, file, draw=True):
@@ -334,7 +361,7 @@ def analyse_file(folder, file, draw=True):
     Mt_corr, Ml_corr, Ms = center_data(H, Mt, Ml, n_Hsat)
 
     # Calcul des champs coercitifs
-    H_coer, n_coer = search_HcHe(H, Ml_corr)
+    H_coer, Mr, Mt_max = inspect_data(H, Mt_corr, Ml_corr)
     logger.info("\t-> Champs coercitifs : {}".format(H_coer))
 
     # On trace le cycle
@@ -348,7 +375,7 @@ def analyse_file(folder, file, draw=True):
     logger.info("Enregistrement des cycles dans {0}".format(fichier))
     np.savetxt(fichier, data, header='H(Oe)\t\t Mt brut(emu)\t\t Ml brut \t\t Mt corrigé \t\t Ml corrigé', comments='#')
 
-    return H, Mt_corr, Ml_corr, H_coer, Ms
+    return H, Mt_corr, Ml_corr, H_coer, Ms, Mr, Mt_max
 
 def analyse_folder(folder):
     """
@@ -367,8 +394,8 @@ def analyse_rotation(folder, prefix, suffix):
     liste = os.listdir(folder)
 
     # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
-    resultats = np.zeros((len(liste), 4))       # tableau : phi, Hc1, Hc2, Ms
-    resultats = np.empty((0, 4), float)
+    # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2
+    resultats = np.empty((0, 8), float)
 
     # On effectue un itération sur les fichiers
     for i, file in enumerate(liste):
@@ -378,10 +405,10 @@ def analyse_rotation(folder, prefix, suffix):
             phi = float(re.sub(".*{}".format(prefix), '', deminom))
             logger.info("VSM -> Angle phi = {} deg".format(phi))
 
-            H, Mt, Ml, H_coer, Ms = analyse_file(folder, file, draw=True)
+            H, Mt, Ml, H_coer, Ms, Mr, Mt_max = analyse_file(folder, file, draw=True)
 
             # On retient les données
-            resultats = np.append(resultats, np.array([[phi, H_coer[0], H_coer[1], Ms]]), axis=0)
+            resultats = np.append(resultats, np.array([[phi, H_coer[0], H_coer[1], Ms, Mr[0], Mr[1], Mt_max[0], Mt_max[1]]]), axis=0)
 
     #Finalement, on enregistre les résultats sur le disque
     nom = "{0}/{1}.dat".format(dos_export, file_rotation)
@@ -395,7 +422,7 @@ def analyse_rotation(folder, prefix, suffix):
 # Programme principal
 ####################
 
-def run():
+def run_analyse():
     global logger       #logger global, pour être utilisé partout
 
     # Création du logger (par défaut dans le répertoire courant)
@@ -420,4 +447,4 @@ def run():
 ####################
 # Éxecution de main en cas de lancement du script, mais pas en cas d'importation.
 if __name__ == "__main__":
-    run()
+    run_analyse()
