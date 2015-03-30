@@ -2,43 +2,72 @@
 # -*- coding: utf-8 -*-
 
 """
-    Programme de lancement de analyseVSM.py, sous forme de module
+    Programme de lancement du module «AnalyseVSM».
+    Le module 'AnalyseVSM' définit l'ensemble des fonctions.
+    Le script 'processVSM.py' est à placer, par ex., dans le dossier à analyser. Il sert à définir l'ensemble des variable nécessaires à l'analyse.
+
+    Usage : 'data/' est le dossier contenant les cycles du VSM.
+        -> python processVSM.py data/
 """
 
-# On commence par importer le module d'analyse
+## Si le module n'est pas installé (path python), on lui directement le chemin
+module_path = '/Users/zorg/These/Documents/Programmes/Python_Modules/'
+import sys
+sys.path.append(module_path)
+
+# On peut alors importer le module princippal
+from AnalyseVSM import *
 
 
-from analyseVSM import *
+## Création de l'environnement
+scpy = Mesures()
+
+## Modification des paramètres par défaut
+scpy.dos_cycles = ''
 
 ####################
 # Varibles / Constantes
 ####################
-# Physique
-mu_0 = 4*np.pi*1e-7 #H/m
-
+# Ces variables permette de définir le comportement des méthodes.
 ## Paramètres courbes
 #zoom
-H_min = -20
-H_max = 20
+scpy.H_min = -20
+scpy.H_max = 20
 
-n_Hsat = 20     # nombre de points utilisé pour déterminer la pente
+scpy.n_Hsat = 20     # nombre de points utilisé pour déterminer la pente
+scpy.H_biais = 0.3  # biais de la sonde de hall(en Oe)
 
 ###### Variable
 # Dossiers
 #dos_cycles -> en argument du script
-dos_plot = "pdf"
-dos_export = "xdat"
+scpy.dos_plot = "pdf"
+scpy.dos_export = "xdat"
 
-# Condition d'analyse
-centrer = True
-rotation = True
+####################
+# Analy
+####################
+# Centrage de Ml et Mt.
+scpy.centrer = True
 
-# Analyse rotation#
+
+####################
+# Varibles / Constantes
+####################
+# Permet de tracer la rotation. L'analyse prend alors en compte les angles selon le prefix et le suffix, et n'analyse pas les autres fichiers.
 # ex : fichier_001deg_n1.dat
 #   -> prefix = "*chier_"
 #   -> suffix "_n*"
-prefix = "rot_"
-suffix = "deg_"
-file_rotation = 'rotation'
+scpy.rotation = True
+scpy.prefix = "rot_"
+scpy.suffix = "deg_"
+scpy.file_rotation = 'rotation'
 
-run()
+# On initialise
+scpy.init()
+
+
+
+####################
+# Lancement du programme
+####################
+scpy.run_analyse()
