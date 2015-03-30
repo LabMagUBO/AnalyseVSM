@@ -8,7 +8,7 @@ import logging
 import os
 
 
-def init_logger(classe, output_dir, log_file=True):
+def init_logger(name, output_dir, log_file=True):
     """
         Méthode d'initialisation du module de logs.
         Niveau : DEBUG
@@ -29,8 +29,7 @@ def init_logger(classe, output_dir, log_file=True):
             logging.error("error message")
             logging.critical("critical message")
     """
-
-    name = type(classe).__name__
+ 
     # Fichiers
     logFile_error = "erreurs.log"
     logFile_all = "messages.log"

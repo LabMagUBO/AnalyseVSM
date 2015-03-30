@@ -79,7 +79,7 @@ class Mesures(object):
             Applique les attributs après éventuelles modifications.
         """
         # On commence par définir un logger
-        self.logger = init_logger(self, '.', log_file=False)
+        self.logger = init_logger(type(self).__name__, '.', log_file=False)
 
         # On recherche le dossier contenant les cycles
         self.dos_cycles = self.set_dosCycles(dossier)
@@ -254,7 +254,6 @@ class Mesures(object):
         # Effectue une rotation
         if self.rotation: self.analyse_rotation()
 
-
 class Cycle(object):
     """
         Object cycle.
@@ -275,7 +274,7 @@ class Cycle(object):
     """
     def __init__(self, mes, unit='CGS'):
         # On crée le logger
-        self.logger = init_logger(self, '.', log_file=False)
+        self.logger = init_logger(type(self).__name__, '.', log_file=False)
 
         # On définie l'unité du cycle
         self.set_unit(unit)
@@ -443,7 +442,7 @@ class Rotation(object):
     """
     def __init__(self, mes):
         # On crée le logger
-        self.logger = init_logger(self, '.', log_file=False)
+        self.logger = init_logger(type(self).__name__, '.', log_file=False)
 
         # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
         # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2
