@@ -17,4 +17,5 @@ import numpy as np
 from matplotlib import pylab as pl
 from scipy import optimize
 
+from AnalyseVSM.variables import *
 from AnalyseVSM.analyse import *

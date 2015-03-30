@@ -47,37 +47,10 @@ import numpy as np
 from matplotlib import pylab as pl
 from scipy import optimize
 
+## Importation des variables
+from AnalyseVSM.variables import *
 
-####################
-# Varibles / Constantes
-####################
-# Physique
-mu_0 = 4*np.pi*1e-7 #H/m
 
-## Paramètres courbes
-#zoom
-H_min = -20
-H_max = 20
-
-n_Hsat = 20     # nombre de points utilisé pour déterminer la pente
-
-###### Variable
-# Dossiers
-#dos_cycles -> en argument du script
-dos_plot = "pdf"
-dos_export = "xdat"
-
-# Condition d'analyse
-centrer = True
-rotation = True
-
-# Analyse rotation#
-# ex : fichier_001deg_n1.dat
-#   -> prefix = "*chier_"
-#   -> suffix "_n*"
-prefix = "rot_"
-suffix = "deg_"
-file_rotation = 'rotation'
 
 
 def init_logger(output_dir, log_file=True):
@@ -142,7 +115,7 @@ def init_logger(output_dir, log_file=True):
 
     return logger
 
-def create_folders():
+def create_folders(dos_plot, dos_export):
     # Folder creation
     for dir in [dos_plot, dos_export]:
             if not os.path.exists(dir):
@@ -199,14 +172,18 @@ def retrieve_data(file, dos):
 
     return H, Mt, Ml
 
-def center_data(H, Mt, Ml, nb):
+def center_data(H, Mt, Ml, nb, H_centre):
     """
         Centre les donnée, en calculant la moyenne des points aux extrémité.
         Condition : aimantation saturée.
         Centrage pour Ml et Mt.
+        Correction du décalage en champ avec H_centre : H <- H - H_centre
         Retourne Mt_corr, Ml_corr, Ms
     """
     milieu = np.floor(H.size / 2)
+
+    #Champ
+    H_corr = H - H_centre
 
     #Transverse
     Mt_moy = np.mean(np.concatenate((Mt[:nb], Mt[-nb:], Mt[milieu - nb : milieu + nb])))
@@ -219,7 +196,7 @@ def center_data(H, Mt, Ml, nb):
     Ms = (Ml_max - Ml_min) / 2
     logger.info("Ms = {}".format(Ms))
     logger.info("Mt base = {}".format(Mt_moy))
-    return Mt - Mt_moy, Ml - (Ml_max + Ml_min) / 2, Ms
+    return H_corr, Mt - Mt_moy, Ml - (Ml_max + Ml_min) / 2, Ms
 
 def inspect_data(H, Mt, Ml):
     """
@@ -358,24 +335,24 @@ def analyse_file(folder, file, draw=True):
     H, Mt, Ml = retrieve_data(folder + '/' + file, dos_plot)
 
     # Recentrage des cycles
-    Mt_corr, Ml_corr, Ms = center_data(H, Mt, Ml, n_Hsat)
+    H_corr, Mt_corr, Ml_corr, Ms = center_data(H, Mt, Ml, n_Hsat, H_centre)
 
     # Calcul des champs coercitifs
-    H_coer, Mr, Mt_max = inspect_data(H, Mt_corr, Ml_corr)
+    H_coer, Mr, Mt_max = inspect_data(H_corr, Mt_corr, Ml_corr)
     logger.info("\t-> Champs coercitifs : {}".format(H_coer))
 
     # On trace le cycle
     nom = os.path.splitext(file)[0]    #juste le nom, sans l'extention
     if draw:
-        trace_cycle(H, Mt_corr, Ml_corr, H_coer, nom)
+        trace_cycle(H_corr, Mt_corr, Ml_corr, H_coer, nom)
 
     # On exporte les datas
-    data = np.column_stack((H, Mt, Ml, Mt_corr, Ml_corr))
+    data = np.column_stack((H_corr, Mt, Ml, Mt_corr, Ml_corr))
     fichier = dos_export + '/' + nom + '.xdat'
     logger.info("Enregistrement des cycles dans {0}".format(fichier))
     np.savetxt(fichier, data, header='H(Oe)\t\t Mt brut(emu)\t\t Ml brut \t\t Mt corrigé \t\t Ml corrigé', comments='#')
 
-    return H, Mt_corr, Ml_corr, H_coer, Ms, Mr, Mt_max
+    return H_corr, Mt_corr, Ml_corr, H_coer, Ms, Mr, Mt_max
 
 def analyse_folder(folder):
     """
@@ -433,7 +410,7 @@ def run_analyse():
     dos_cycles = get_input()
 
     # Création des dossiers utiles
-    create_folders()
+    create_folders(dos_plot, dos_export)
 
     # Analyse et trace le dossier
     if not rotation: analyse_folder(dos_cycles)
