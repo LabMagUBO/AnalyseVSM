@@ -10,21 +10,64 @@
         -> python processVSM.py data/
 """
 
-####################
-# Importation «AnalyseVSM»
-####################
 ## Si le module n'est pas installé (path python), on lui directement le chemin
 module_path = '/Users/zorg/These/Documents/Programmes/Python_Modules/'
 import sys
 sys.path.append(module_path)
 
-# on peut alors l'importer
+# On peut alors importer le module princippal
 from AnalyseVSM import *
+
+
+## Création de l'environnement
+scpy = Mesures()
+
+## Modification des paramètres par défaut
+scpy.dos_cycles = ''
+
+####################
+# Varibles / Constantes
+####################
+# Ces variables permette de définir le comportement des méthodes.
+## Paramètres courbes
+#zoom
+scpy.H_min = -20
+scpy.H_max = 20
+
+scpy.n_Hsat = 20     # nombre de points utilisé pour déterminer la pente
+scpy.H_biais = 0.3  # biais de la sonde de hall(en Oe)
+
+###### Variable
+# Dossiers
+#dos_cycles -> en argument du script
+scpy.dos_plot = "pdf"
+scpy.dos_export = "xdat"
+
+####################
+# Analy
+####################
+# Centrage de Ml et Mt.
+scpy.centrer = True
+
+
+####################
+# Varibles / Constantes
+####################
+# Permet de tracer la rotation. L'analyse prend alors en compte les angles selon le prefix et le suffix, et n'analyse pas les autres fichiers.
+# ex : fichier_001deg_n1.dat
+#   -> prefix = "*chier_"
+#   -> suffix "_n*"
+scpy.rotation = True
+scpy.prefix = "rot_"
+scpy.suffix = "deg_"
+scpy.file_rotation = 'rotation'
+
+# On initialise
+scpy.init()
 
 
 
 ####################
 # Lancement du programme
 ####################
-
-run_analyse()
+scpy.run_analyse()
