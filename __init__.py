@@ -23,7 +23,7 @@ __version__ = '0.1, 2015-03-31'
 # Sous-modules «AnalyseVSM»
 from AnalyseVSM.logger import *
 from AnalyseVSM.constantes import *
-from AnalyseVSM.Mesures import *
+from AnalyseVSM.Classes import *
 #from AnalyseVSM.analyse import *
 
 logger = init_logger(__name__, '.')
