@@ -238,8 +238,10 @@ class Mesures(object):
                 # et on enregistre les paramètres du cycle
                 rot.add_cycle(c, phi)
 
+        # Dans le cas où c'est dans le désordre
+        rot.order_data()
 
-        #Finalement, on enregistre les résultats dans un fichier
+        # Finalement, on enregistre les résultats dans un fichier
         rot.export()
 
         # et on trace
@@ -459,8 +461,18 @@ class Rotation(object):
         parameters = np.array([[phi, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1]]])
         self.tab = np.append(self.tab, parameters, axis=0)
 
+    def order_data(self):
+        # sorting the data along the angle column
+        self.tab = self.tab[self.tab[:, 0].argsort()]
+
     def export(self):
-        np.savetxt(self.file_export, self.tab, header="angle phi (deg)\t\t Hc gauche (Oe)\t\t Hc droit (Oe)\t\t Ms (emu)", comments='#')
+        # exporting data
+        np.savetxt(
+            self.file_export,
+            self.tab,
+            header="angle phi (deg)\t\t Hc- (Oe)\t\t Hc+ (Oe)\t\t Ms (emu)\t\t Mr+ (emu) \t\t Mr-(emu) \t\t Mt_max (emu)+ \t\t Mt_max - (emu)",
+            comments='#'
+        )
 
 
     def plot(self):
