@@ -50,6 +50,7 @@ class Mesures(object):
         self.n_Hmoy = 20    # nombre de points utilisé pour la moyenne
         self.n_Hslope = 20  # nombre de points utilisé pour déterminer la pente
         self.H_shift = 0.    # biais de la sonde de hall(en Oe)
+        self.ref_angle = 0.     # reference angle of the VSM
 
         ###### Variable
         # Dossiers
@@ -254,13 +255,18 @@ class Mesures(object):
                 deminom = re.sub("{0}.*".format(self.suffix), '', file)
                 phi = float(re.sub(".*{}".format(self.prefix), '', deminom))
 
-                self.logger.info("VSM -> Angle phi = {} deg".format(phi))
+                self.logger.info(
+                    "VSM -> Angle phi = {} deg -> Nouvel angle = {} deg".format(
+                        phi,
+                        phi-self.ref_angle
+                    )
+                )
 
                 # On calcul les paramètres du cycle
                 c = self.analyse_file(filepath)
 
                 # et on enregistre les paramètres du cycle
-                rot.add_cycle(c, phi)
+                rot.add_cycle(c, phi, self.ref_angle)
 
         # Dans le cas où c'est dans le désordre
         rot.order_data()
@@ -445,7 +451,7 @@ class Cycle(object):
         # Renseignements
         ax.plot(self.H, self.Ml, 'ro-', label='Ml')
         ax.plot(self.H, self.Mt, 'go-', label='Mt')
-        ax.legend()
+        ax.legend(loc='lower right')
 
         y_lim = ax.get_ylim()
         x_lim = ax.get_xlim()
@@ -460,7 +466,7 @@ class Cycle(object):
         ax.set_title("zoom")
         ax.plot(self.H, self.Ml, 'ro-', label='Ml')
         ax.plot(self.H, self.Mt, 'go-', label='Mt')
-        ax.legend()
+        ax.legend(loc='lower right')
 
         ax.set_xlim(self.H_min, self.H_max)
 
@@ -469,7 +475,7 @@ class Cycle(object):
         # Renseignements
         ax.plot(self.H_corr, self.Ml_corr, 'ro-', label='Ml')
         ax.plot(self.H_corr, self.Mt_corr, 'go-', label='Mt')
-        ax.legend()
+        ax.legend(loc='lower right')
 
         y_lim = ax.get_ylim()
         x_lim = ax.get_xlim()
@@ -484,7 +490,7 @@ class Cycle(object):
         ax.set_title("zoom")
         ax.plot(self.H_corr, self.Ml_corr, 'ro-', label='Ml')
         ax.plot(self.H_corr, self.Mt_corr, 'go-', label='Mt')
-        ax.legend()
+        ax.legend(loc='lower right')
 
         ax.set_xlim(self.H_min, self.H_max)
 
@@ -523,18 +529,18 @@ class Rotation(object):
         self.logger = init_logger(type(self).__name__, '.', log_file=False)
 
         # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
-        # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2
-        self.tab = np.empty((0, 8), float)
+        # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2, ancien phi
+        self.tab = np.empty((0, 9), float)
 
         self.file_export = "{0}/{1}.dat".format(mes.dos_export, mes.file_rot)
         self.file_plot = "{0}/{1}.pdf".format(mes.dos_plot, mes.file_rot)
 
-    def add_cycle(self, cycle, phi):
+    def add_cycle(self, cycle, phi, phi_ref):
         """
             Ajoute les paramètres du cycle en argument au tableau, selon l'angle donné.
         """
         # On retient les données
-        parameters = np.array([[phi, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1]]])
+        parameters = np.array([[phi - phi_ref, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1], phi]])
         self.tab = np.append(self.tab, parameters, axis=0)
 
     def order_data(self):
@@ -546,7 +552,7 @@ class Rotation(object):
         np.savetxt(
             self.file_export,
             self.tab,
-            header="angle phi (deg)\t\t Hc- (Oe)\t\t Hc+ (Oe)\t\t Ms (emu)\t\t Mr+ (emu) \t\t Mr-(emu) \t\t Mt_max (emu)+ \t\t Mt_max - (emu)",
+            header="angle phi (deg)\t\t Hc- (Oe)\t\t Hc+ (Oe)\t\t Ms (emu)\t\t Mr+ (emu) \t\t Mr-(emu) \t\t Mt_max (emu)+ \t\t Mt_max - (emu) \t\t ancien phi (deg)",
             comments='#'
         )
 
