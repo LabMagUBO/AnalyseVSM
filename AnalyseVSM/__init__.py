@@ -4,7 +4,7 @@
     Fichier d'initialisation du module.
     À importer en premier.
 """
-__version__ = '0.1, 2015-03-31'
+__version__ = '0.2, 2016-03-15'
 
 # Modules généraux
 #import os
