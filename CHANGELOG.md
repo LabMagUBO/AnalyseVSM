@@ -1,6 +1,19 @@
 # Change Log
 
-## [1.4](https://github.com/skywinder/github-changelog-generator/tree/1.10.1) (2016-01-06)
+## [0.2](https://github.com/LabMagUBO/AnalyseVSM) (2016-03-15)
+[Full Changelog](https://github.com/skywinder/github-changelog-generator/compare/1.10.0...1.10.1)
+
+**Improvements:**
+
+- Adding Latex in exported pdfs.
+- Coherences in the units.
+
+**Fixed bugs:**
+
+- Parser: avoid Ruby exit, to make Rake tasks work [\#315](https://github.com/skywinder/github-changelog-generator/pull/315) ([olleolleolle](https://github.com/olleolleolle))
+
+
+## [0.1](https://github.com/LabMagUBO/AnalyseVSM) (2016-03-15)
 [Full Changelog](https://github.com/skywinder/github-changelog-generator/compare/1.10.0...1.10.1)
 
 **Fixed bugs:**
