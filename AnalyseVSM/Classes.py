@@ -9,6 +9,17 @@
         — facteur pour tracer les courbes (milli, micro, …)
 """
 
+import matplotlib as mpl
+
+# Paramètres pour Latex
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.size'] = 10
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = 'cm'
+mpl.rcParams.update({'font.size': 10})
+mpl.rcParams['text.latex.unicode'] = True
+mpl.rcParams['text.latex.preamble'] = [r"\usepackage{amsmath, siunitx}"]
+
 # Gestion des fichiers/dossiers
 import sys
 import os
@@ -19,13 +30,17 @@ import re           # for regular expression
 # Sciences
 import numpy as np
 from matplotlib import pylab as pl
+from scipy import stats
 
 # Pour les logs
 from AnalyseVSM.logger import *
 
-################################################################################
+
+###############################################################################
 # Définition de la classe
-################################################################################
+###############################################################################
+
+
 class Mesures(object):
     """
         Classe général «Mesures».
@@ -42,37 +57,44 @@ class Mesures(object):
         ####################
         # Ces variables permette de définir le comportement des méthodes.
         ## Paramètres courbes
-        #zoom
+        # zoom
         self.H_min = -20
         self.H_max = 20
 
-        self.H_nMoy = 20     # nombre de points utilisé pour déterminer la pente
-        self.H_shift = 0.3  # biais de la sonde de hall(en Oe)
+        self.n_Hmoy = 20    # nombre de points utilisé pour la moyenne
+        self.n_Hslope = 20  # nombre de points utilisé pour déterminer la pente
+        self.H_shift = 0.    # biais de la sonde de hall(en Oe)
+        self.ref_angle = 0.     # reference angle of the VSM
 
-        ###### Variable
+        # ##### Variable
         # Dossiers
-        #dos_cycles -> en argument du script
+        # dos_cycles -> en argument du script
         self.dos_plot = "pdf"
         self.dos_export = "xdat"
 
         ####################
-        # Analy
+        # Analyse
         ####################
+        # Retranche la pente
+        self.do_slope = True
         # Centrage de Ml et Mt.
         self.do_center = True
 
-
-        ####################
+        # ###################
         # Varibles / Constantes
-        ####################
-        # Permet de tracer la rotation. L'analyse prend alors en compte les angles selon le prefix et le suffix, et n'analyse pas les autres fichiers.
+        # ###################
+        # Permet de tracer la rotation. L'analyse prend alors en compte
+        # les angles selon le prefix et le suffix, et n'analyse pas les
+        # autres fichiers.
         # ex : fichier_001deg_n1.dat
         #   -> prefix = "*chier_"
         #   -> suffix "_n*"
         self.do_rotation = True
+
         self.prefix = "rot_"
         self.suffix = "deg_"
         self.file_rot = 'rotation'
+        self.force_deletion = False
 
     def init(self, dossier=''):
         """
@@ -90,8 +112,10 @@ class Mesures(object):
     def set_dosCycles(self, dos):
         """
             Définit le dossier contenant les données.
-            Si un dossier est donné lors de l'initialisation, ce dernier est pris par défaut.
-            Sinon (dossier '' ou inexistant), regarde si un argument est présent lors du lancement du script.
+            Si un dossier est donné lors de l'initialisation, ce dernier est
+            pris par défaut.
+            Sinon (dossier '' ou inexistant), regarde si un argument est
+            présent lors du lancement du script.
             Stoppe si aucun dossier n'existe.
         """
         if dos == '':
@@ -134,6 +158,15 @@ class Mesures(object):
                 if not os.path.exists(dir):
                     os.makedirs(dir)
                     self.logger.info("Création du dossier '{}'.".format(dir))
+
+                elif self.force_deletion:
+                    self.logger.info("Dossier '{}' existant.".format(dir))
+                    self.logger.info("Tant pis, j'efface sans demander.")
+                    shutil.rmtree(dir)
+                    self.logger.info(
+                        "Création du dossier '{}'.".format(dir)
+                    )
+                    os.makedirs(dir)
                 else:
                     self.logger.info("Dossier '{}' existant.".format(dir))
                     # On demande quoi faire
@@ -144,7 +177,9 @@ class Mesures(object):
                     if reponse in choix_oui:
                         self.logger.info("Okayy... J'efface ça.")
                         shutil.rmtree(dir)
-                        self.logger.info("Création du dossier '{}'.".format(dir))
+                        self.logger.info(
+                            "Création du dossier '{}'.".format(dir)
+                        )
                         os.makedirs(dir)
                     elif reponse in choix_non:
                         self.logger.info("Je touche à rien.")
@@ -161,10 +196,18 @@ class Mesures(object):
         self.logger.info("Traitement de '{}'".format(filepath))
 
         # Ouverture du fichier de données (type string unicode)
-        data = np.genfromtxt(filepath, dtype='str', delimiter="\t", skip_header=1, skip_footer=5, usecols=(0, 1, 2), unpack=False)
+        data = np.genfromtxt(
+            filepath,
+            dtype='str',
+            delimiter="\t",
+            skip_header=1,
+            skip_footer=5,
+            usecols=(0, 1, 2),
+            unpack=False
+        )
 
         # On remplace les ',' par des '.', et on convertit en nombre
-        data = np.core.defchararray.replace(data, ',','.').astype(float)
+        data = np.core.defchararray.replace(data, ',', '.').astype(float)
 
         # On place les données dans un cycle
         c = Cycle(self, 'CGS')
@@ -191,8 +234,16 @@ class Mesures(object):
         # Lecture du fichier
         c = self.read_cycle(filepath)
 
+        # Corrige le champ et crée les nouvelles données
+        c.do_correct(self)
+
+        # Enlève la pente
+        if self.do_slope:
+            c.do_slope(self)
+
         # Recentrage des données en fonction des paramètres de mesure
-        c.do_center(self)
+        if self.do_center:
+            c.do_center(self)
 
         # Calcul des champs coercitifs et autres caractéristiques
         c.calc_properties()
@@ -230,16 +281,23 @@ class Mesures(object):
                 deminom = re.sub("{0}.*".format(self.suffix), '', file)
                 phi = float(re.sub(".*{}".format(self.prefix), '', deminom))
 
-                self.logger.info("VSM -> Angle phi = {} deg".format(phi))
+                self.logger.info(
+                    "VSM -> Angle phi = {} deg -> Nouvel angle = {} deg".format(
+                        phi,
+                        phi-self.ref_angle
+                    )
+                )
 
                 # On calcul les paramètres du cycle
                 c = self.analyse_file(filepath)
 
                 # et on enregistre les paramètres du cycle
-                rot.add_cycle(c, phi)
+                rot.add_cycle(c, phi, self.ref_angle)
 
+        # Dans le cas où c'est dans le désordre
+        rot.order_data()
 
-        #Finalement, on enregistre les résultats dans un fichier
+        # Finalement, on enregistre les résultats dans un fichier
         rot.export()
 
         # et on trace
@@ -298,29 +356,54 @@ class Cycle(object):
         self.Ml = data[:, 2]
         self.Mt = data[:, 1]
 
+    def do_correct(self, mes):
+        """
+            Corrige le champ du décalage de la sonde.
+            Crée les nouveaux tableaux.
+        """
+        # Modification du champ
+        self.H_corr = self.H - mes.H_shift
+        self.Mt_corr = self.Mt
+        self.Ml_corr = self.Ml
+
+    def do_slope(self, mes):
+        """
+            Permet de retrancher la pente du signal longitudinal,
+            en la calculant au début du cycle.
+            Dépends de mes.n_Hmoy.
+        """
+        # Nombre de points utilisés pour la pente
+        nb = mes.n_Hslope
+
+        # Régression linéaire
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            self.H_corr[:nb],
+            self.Ml_corr[:nb]
+        )
+
+        # On corrige
+        self.Ml_corr = self.Ml_corr - slope * self.H_corr
+
     def do_center(self, mes):
         """
-            Centre les données, en calculant la moyenne des points aux extrémité.
+            Centre les données, en calculant la moyenne des points aux extrémités.
             Condition : aimantation saturée.
             Centrage pour Ml et Mt.
             Correction du décalage en champ avec H_centre : H <- H - H_centre
             Retourne Mt_corr, Ml_corr, Ms
         """
         # Nombre de points utilisés pour la moyenne
-        nb = mes.H_nMoy
+        nb = mes.n_Hmoy
 
         # Partage le cycle en deux
         milieu = np.floor(self.H.size / 2)
 
-        # Modification du champ
-        self.H_corr = self.H - mes.H_shift
+        # Transverse
+        Mt_moy = np.mean(np.concatenate((self.Mt_corr[:nb], self.Mt_corr[-nb:], self.Mt_corr[milieu - nb : milieu + nb])))
 
-        #Transverse
-        Mt_moy = np.mean(np.concatenate((self.Mt[:nb], self.Mt[-nb:], self.Mt[milieu - nb : milieu + nb])))
-
-        #Longitudinal
-        Ml_max = np.mean(np.concatenate((self.Ml[:nb], self.Ml[-nb:])))
-        Ml_min = np.mean(self.Ml[milieu - nb: milieu + nb])
+        # Longitudinal
+        Ml_max = np.mean(np.concatenate((self.Ml_corr[:nb], self.Ml_corr[-nb:])))
+        Ml_min = np.mean(self.Ml_corr[milieu - nb: milieu + nb])
 
         # On enregistre l'aimantation à saturation
         self.Ms = (Ml_max - Ml_min) / 2
@@ -328,8 +411,8 @@ class Cycle(object):
         self.logger.info("Mt base = {}".format(Mt_moy))
 
         # et Mt_corr, Ml_corr
-        self.Mt_corr = self.Mt - Mt_moy
-        self.Ml_corr = self.Ml - (Ml_max + Ml_min) / 2
+        self.Mt_corr = self.Mt_corr - Mt_moy
+        self.Ml_corr = self.Ml_corr - (Ml_max + Ml_min) / 2
 
     def calc_properties(self):
         """
@@ -345,7 +428,8 @@ class Cycle(object):
                 — Mr     : aimantations rémanentes
                 — Mt_max : max de transverse
         """
-        # Le tableau des champs coercitif : le 1 est celui de droite, le 0 celui de gauche
+        # Le tableau des champs coercitif :
+        #       le 1 est celui de droite, le 0 celui de gauche
         self.H_coer = np.zeros(2)
         self.Mr = np.zeros(2)
         self.Mt_max = np.zeros(2)
@@ -391,26 +475,64 @@ class Cycle(object):
         ax = fig.add_subplot(221)
         ax.grid(True)
         # Renseignements
-        ax.plot(self.H_corr, self.Ml_corr, 'ro-', label='Ml')
-        ax.plot(self.H_corr, self.Mt_corr, 'go-', label='Mt')
-        ax.legend()
+        ax.plot(self.H, self.Ml, 'ro-', label=r'$M_\mathrm{l}$')
+        ax.plot(self.H, self.Mt, 'go-', label=r'$M_\mathrm{t}$')
+        ax.legend(loc='lower right')
 
         y_lim = ax.get_ylim()
         x_lim = ax.get_xlim()
         x_text = (x_lim[1] - x_lim[0]) * 0.15 + x_lim[0]
         y_text = (y_lim[1] - y_lim[0]) * 0.8 + y_lim[0]
-        ax.text(x_text, y_text, "Hc = {0}Oe\nHe = {1}Oe".format(Hc, He), style='italic', bbox={'facecolor':'white', 'alpha':1, 'pad':10})
+        ax.text(
+            x_text,
+            y_text,
+            r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He),
+            style='italic',
+            bbox={'facecolor': 'white', 'alpha': 1, 'pad': 10}
+        )
 
         ax = fig.add_subplot(222)
         ax.grid(True)
 
         # Renseignements
         ax.set_title("zoom")
-        ax.plot(self.H_corr, self.Ml_corr, 'ro-', label='Ml')
-        ax.plot(self.H_corr, self.Mt_corr, 'go-', label='Mt')
-        ax.legend()
+        ax.plot(self.H, self.Ml, 'ro-', label=r'$M_\mathrm{l}$')
+        ax.plot(self.H, self.Mt, 'go-', label=r'$M_\mathrm{t}$')
+        ax.legend(loc='lower right')
 
         ax.set_xlim(self.H_min, self.H_max)
+
+        ax = fig.add_subplot(223)
+        ax.grid(True)
+        # Renseignements
+        ax.plot(self.H_corr, self.Ml_corr, 'ro-', label=r'$M_\mathrm{l}$')
+        ax.plot(self.H_corr, self.Mt_corr, 'go-', label=r'$M_\mathrm{t}$')
+        ax.legend(loc='lower right')
+
+        y_lim = ax.get_ylim()
+        x_lim = ax.get_xlim()
+        x_text = (x_lim[1] - x_lim[0]) * 0.15 + x_lim[0]
+        y_text = (y_lim[1] - y_lim[0]) * 0.8 + y_lim[0]
+        ax.text(
+            x_text,
+            y_text,
+            r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He),
+            style='italic',
+            bbox={'facecolor': 'white', 'alpha': 1, 'pad': 10}
+        )
+
+        ax = fig.add_subplot(224)
+        ax.grid(True)
+
+        # Renseignements
+        ax.set_title("zoom")
+        ax.plot(self.H_corr, self.Ml_corr, 'ro-', label=r'$M_\mathrm{l}$')
+        ax.plot(self.H_corr, self.Mt_corr, 'go-', label=r'$M_\mathrm{t}$')
+        ax.legend(loc='lower right')
+
+        ax.set_xlim(self.H_min, self.H_max)
+
+
 
         #On trace en exportant
         self.logger.info("Exportation du tracé : {}".format(file))
@@ -445,56 +567,154 @@ class Rotation(object):
         self.logger = init_logger(type(self).__name__, '.', log_file=False)
 
         # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
-        # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2
-        self.tab = np.empty((0, 8), float)
+        # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2, ancien phi
+        self.tab = np.empty((0, 9), float)
 
         self.file_export = "{0}/{1}.dat".format(mes.dos_export, mes.file_rot)
         self.file_plot = "{0}/{1}.pdf".format(mes.dos_plot, mes.file_rot)
 
-    def add_cycle(self, cycle, phi):
+    def add_cycle(self, cycle, phi, phi_ref):
         """
             Ajoute les paramètres du cycle en argument au tableau, selon l'angle donné.
         """
         # On retient les données
-        parameters = np.array([[phi, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1]]])
+        parameters = np.array([[phi - phi_ref, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1], phi]])
         self.tab = np.append(self.tab, parameters, axis=0)
 
-    def export(self):
-        np.savetxt(self.file_export, self.tab, header="angle phi (deg)\t\t Hc gauche (Oe)\t\t Hc droit (Oe)\t\t Ms (emu)", comments='#')
+    def order_data(self):
+        # sorting the data along the angle column
+        self.tab = self.tab[self.tab[:, 0].argsort()]
 
+    def export(self):
+        # exporting data
+        np.savetxt(
+            self.file_export,
+            self.tab,
+            header="""
+angle phi (deg)\t\t
+Hc- (Oe)\t\t
+Hc+ (Oe)\t\t
+Ms (emu)\t\t
+Mr- (emu) \t\t
+Mr+(emu) \t\t
+max(|Mt-|) (emu)+ \t\t
+max(|Mt+|) (emu) \t\t
+ancien phi (deg)
+""",
+            comments='#'
+        )
 
     def plot(self):
         """
             Trace l'évolution azimutal de data.
+            Les variables tracées sont :
+                — Hc (Oe)
+                — He (Oe)
         """
         data = self.tab
 
         fig = pl.figure()
-        fig.set_size_inches(18.5,18.5)
-        coer = fig.add_subplot(221, polar=True)
+        fig.set_size_inches(18.5, 18.5)
+
+        # Tracé de Hc
+        coer = fig.add_subplot(321, polar=True)
         coer.grid(True)
-        coer.plot(np.radians(data[:, 0]), np.abs((data[:, 1]-data[:,2])/2), 'ro-', label='Hc (Oe)')
+        coer.plot(
+            np.radians(data[:, 0]),
+            np.abs((data[:, 1] - data[:, 2]) / 2),
+            'ro-', label=r'$H_\mathrm{c}$ (Oe)'
+        )
         coer.legend()
 
-        ex = fig.add_subplot(222, polar=True)
+        # Tracé de He
+        ex = fig.add_subplot(322, polar=True)
         ex.grid(True)
-        ex.plot(np.radians(data[:, 0]), np.abs((data[:, 1]+data[:,2])/2), 'bo-', label='He (Oe)')
+        ex.plot(
+            np.radians(data[:, 0]), np.abs((data[:, 1]+data[:, 2])/2),
+            'bo-', label=r'$H_\mathrm{e}$ (Oe)'
+        )
         ex.legend()
 
-        rem = fig.add_subplot(224, polar = True)
-        rem.grid(True)
-        rem.plot(np.radians(data[:,0]), np.abs(data[:, 4] / data[:, 3]), 'mo-', label='Mr_1 / Ms')
-        rem.plot(np.radians(data[:,0]), np.abs(data[:, 5] / data[:, 3]), 'co-', label='Mr_2 / Ms')
-        rem.legend()
-
-        trans = fig.add_subplot(223, polar = True)
+        # Tracé de abs(max(Mt[i])) et abs(min(Mt[i)]))
+        trans = fig.add_subplot(323, polar=True)
         trans.grid(True)
-        trans.plot(np.radians(data[:, 0]), np.abs(data[:, 6] / data[:, 3]), 'go-', label='min(Mt) (A m**2)')
-        trans.plot(np.radians(data[:, 0]), np.abs(data[:, 7] / data[:, 3]), 'yo-', label='max(Mt) (A m**2)')
-        trans.legend()
+        trans.plot(
+            np.radians(data[:, 0]),
+            np.abs(data[:, 6]) * 1e3,
+            'go-', label=r'$\min{|M_t^-|}$ (\si{mEMU})'
+        )
+        trans.plot(
+            np.radians(data[:, 0]),
+            np.abs(data[:, 7]) * 1e3,
+            'yo-', label=r'$\max{|M_t^+|}$ (\si{mEMU})'
+        )
+        trans.legend(
+            loc=2,
+            bbox_to_anchor=(1.1, 1.1),
+            fontsize=10
+        )
 
-        #On trace en exportant
-        self.logger.info("Exportation du tracé azimutal : {}".format(self.file_plot))
+        # Tracé de Mr1 / Ms et Mr2 / Ms
+        rem = fig.add_subplot(324, polar=True)
+        rem.grid(True)
+        rem.plot(
+            np.radians(data[:, 0]),
+            np.abs(data[:, 4]) * 1e3,
+            'mo-',
+            label=r'$M_\mathrm{r}^{-}$ (\si{mEMU})'
+        )
+        rem.plot(
+            np.radians(data[:, 0]),
+            np.abs(data[:, 5]) * 1e3,
+            'co-',
+            label=r'$M_\mathrm{r}^{+}$ (\si{mEMU})'
+        )
+        rem.plot(
+            np.radians(data[:, 0]),
+            data[:, 3] * 1e3,
+            'bo-',
+            label=r'$M_\mathrm{s}$ (\si{mEMU})'
+        )
+        rem.legend(
+            loc=2,
+            bbox_to_anchor=(1.1, 1.1),
+            fontsize=10
+        )
+
+        # Tracé de moy(max, min)(Mt)/Ms
+        trans = fig.add_subplot(325, polar=True)
+        trans.grid(True)
+        trans.plot(
+            np.radians(data[:, 0]),
+            (np.abs(data[:, 6]) + np.abs(data[:, 7])) / (2 * data[:, 3]),
+            'go-',
+            label=r'$(\max{|M_\mathrm{t}^{-}|} + \max{|M_\mathrm{t}^{+}|})/(2 M_\mathrm{s})$'
+        )
+        trans.legend(
+            loc=2,
+            bbox_to_anchor=(1.1, 1.1),
+            fontsize=10
+        )
+
+        # Tracé de moy(Mr1, Mr2)/Ms
+        rem = fig.add_subplot(326, polar=True)
+        rem.grid(True)
+        rem.plot(
+            np.radians(data[:, 0]),
+            (np.abs(data[:, 4]) + np.abs(data[:, 5])) / (2 * data[:, 3]),
+            'mo-',
+            label=r'$(|M_\mathrm{r}^{-}| + |M_\mathrm{r}^{+}|)/(2M_\mathrm{s})$'
+        )
+        rem.legend(
+            loc=2,
+            bbox_to_anchor=(1.1, 1.1),
+            fontsize=10
+        )
+
+        # On trace en exportant
+        self.logger.info(
+            "Exportation du tracé azimutal : {}".format(self.file_plot)
+        )
         pl.savefig(self.file_plot, dpi=100)
 
         pl.close(fig)

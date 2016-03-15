@@ -4,7 +4,7 @@
     Fichier d'initialisation du module.
     À importer en premier.
 """
-__version__ = '0.1, 2015-03-31'
+__version__ = '0.2, 2016-03-15'
 
 # Modules généraux
 #import os
@@ -23,7 +23,7 @@ __version__ = '0.1, 2015-03-31'
 # Sous-modules «AnalyseVSM»
 from AnalyseVSM.logger import *
 from AnalyseVSM.constantes import *
-from AnalyseVSM.Mesures import *
+from AnalyseVSM.Classes import *
 #from AnalyseVSM.analyse import *
 
 logger = init_logger(__name__, '.')
