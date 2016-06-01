@@ -1,5 +1,16 @@
 # Change Log
 
+## [next](https://github.com/LabMagUBO/AnalyseVSM) (2016-03-15)
+[Full Changelog](https://github.com/skywinder/github-changelog-generator/compare/1.10.0...1.10.1)
+
+**Improvements:**
+
+- Improve speed.
+- Added element like Hc, He, ... in exported 'rotation.dat'.
+
+**Fixed bugs:**
+
+
 ## [0.2](https://github.com/LabMagUBO/AnalyseVSM) (2016-03-15)
 [Full Changelog](https://github.com/skywinder/github-changelog-generator/compare/1.10.0...1.10.1)
 

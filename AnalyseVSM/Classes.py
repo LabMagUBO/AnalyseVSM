@@ -12,13 +12,13 @@
 import matplotlib as mpl
 
 # Paramètres pour Latex
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.size'] = 10
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['font.serif'] = 'cm'
-mpl.rcParams.update({'font.size': 10})
-mpl.rcParams['text.latex.unicode'] = True
-mpl.rcParams['text.latex.preamble'] = [r"\usepackage{amsmath, siunitx}"]
+#mpl.rcParams['text.usetex'] = False
+#mpl.rcParams['font.size'] = 10
+#mpl.rcParams['font.family'] = 'serif'
+#mpl.rcParams['font.serif'] = 'cm'
+#mpl.rcParams.update({'font.size': 10})
+#mpl.rcParams['text.latex.unicode'] = True
+#mpl.rcParams['text.latex.preamble'] = [r"\usepackage{amsmath, siunitx}"]
 
 # Gestion des fichiers/dossiers
 import sys
@@ -96,6 +96,9 @@ class Mesures(object):
         self.file_rot = 'rotation'
         self.force_deletion = False
 
+        # Tex compilation
+        self.tex = False
+
     def init(self, dossier=''):
         """
             Applique les attributs après éventuelles modifications.
@@ -108,6 +111,20 @@ class Mesures(object):
 
         # Création des dossiers utiles
         self.create_folders(self.dos_plot, self.dos_export)
+
+        # Définition de TeX
+        if self.tex:
+            self.set_tex()
+
+    def set_tex(self):
+        # Paramètres pour Latex
+        mpl.rcParams['text.usetex'] = True
+        mpl.rcParams['font.size'] = 10
+        mpl.rcParams['font.family'] = 'serif'
+        mpl.rcParams['font.serif'] = 'cm'
+        mpl.rcParams.update({'font.size': 10})
+        mpl.rcParams['text.latex.unicode'] = True
+        mpl.rcParams['text.latex.preamble'] = [r"\usepackage{amsmath, siunitx}"]
 
     def set_dosCycles(self, dos):
         """
@@ -340,6 +357,9 @@ class Cycle(object):
         self.H_min = mes.H_min
         self.H_max = mes.H_max
 
+        # TeX check
+        self.tex = mes.tex
+
     def set_unit(self, unit):
         """
             Méthode définissant l'unité.
@@ -481,12 +501,19 @@ class Cycle(object):
 
         y_lim = ax.get_ylim()
         x_lim = ax.get_xlim()
-        x_text = (x_lim[1] - x_lim[0]) * 0.15 + x_lim[0]
-        y_text = (y_lim[1] - y_lim[0]) * 0.8 + y_lim[0]
+        x_text = (x_lim[1] - x_lim[0]) * 0.1 + x_lim[0]
+        y_text = (y_lim[1] - y_lim[0]) * 0.9 + y_lim[0]
+
+        if self.tex:
+            texte = r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He)
+        else:
+            texte = r"""$H_c$ = {} Oe
+$H_e$ = {} Oe""".format(Hc, He)
+
         ax.text(
             x_text,
             y_text,
-            r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He),
+            texte,
             style='italic',
             bbox={'facecolor': 'white', 'alpha': 1, 'pad': 10}
         )
@@ -511,12 +538,19 @@ class Cycle(object):
 
         y_lim = ax.get_ylim()
         x_lim = ax.get_xlim()
-        x_text = (x_lim[1] - x_lim[0]) * 0.15 + x_lim[0]
-        y_text = (y_lim[1] - y_lim[0]) * 0.8 + y_lim[0]
+        x_text = (x_lim[1] - x_lim[0]) * 0.1 + x_lim[0]
+        y_text = (y_lim[1] - y_lim[0]) * 0.9 + y_lim[0]
+
+        if self.tex:
+            texte = r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He)
+        else:
+            texte = r"""$H_c$ = {} Oe
+$H_e$ = {} Oe""".format(Hc, He)
+
         ax.text(
             x_text,
             y_text,
-            r'\noindent$H_\mathrm{{c}} = \SI{{{}}}{{Oe}}\\H_\mathrm{{e}} = \SI{{{}}}{{Oe}}$'.format(Hc, He),
+            texte,
             style='italic',
             bbox={'facecolor': 'white', 'alpha': 1, 'pad': 10}
         )
@@ -568,7 +602,7 @@ class Rotation(object):
 
         # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
         # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2, ancien phi
-        self.tab = np.empty((0, 9), float)
+        self.tab = np.empty((0, 13), float)
 
         self.file_export = "{0}/{1}.dat".format(mes.dos_export, mes.file_rot)
         self.file_plot = "{0}/{1}.pdf".format(mes.dos_plot, mes.file_rot)
@@ -578,7 +612,21 @@ class Rotation(object):
             Ajoute les paramètres du cycle en argument au tableau, selon l'angle donné.
         """
         # On retient les données
-        parameters = np.array([[phi - phi_ref, cycle.H_coer[0], cycle.H_coer[1], cycle.Ms, cycle.Mr[0], cycle.Mr[1], cycle.Mt_max[0], cycle.Mt_max[1], phi]])
+        parameters = np.array([[
+            phi - phi_ref,
+            cycle.H_coer[0],
+            cycle.H_coer[1],
+            cycle.Ms,
+            cycle.Mr[0],
+            cycle.Mr[1],
+            cycle.Mt_max[0],
+            cycle.Mt_max[1],
+            phi,
+            (cycle.H_coer[1] - cycle.H_coer[0]) / 2,
+            (cycle.H_coer[1] + cycle.H_coer[0]) / 2,
+            (np.abs(cycle.Mr[0]) + np.abs(cycle.Mr[1])) / 2 / cycle.Ms,
+            (np.abs(cycle.Mt_max[0]) + np.abs(cycle.Mt_max[1])) / 2 / cycle.Ms,
+        ]])
         self.tab = np.append(self.tab, parameters, axis=0)
 
     def order_data(self):
@@ -599,7 +647,11 @@ Mr- (emu) \t\t
 Mr+(emu) \t\t
 max(|Mt-|) (emu)+ \t\t
 max(|Mt+|) (emu) \t\t
-ancien phi (deg)
+ancien phi (deg) \t\t
+Hc (Oe)\t\t
+He (Oe)\t\t
+moy(Mr/Ms)\t\t
+moy(Mt/Ms)
 """,
             comments='#'
         )
