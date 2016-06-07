@@ -416,10 +416,16 @@ class Cycle(object):
         nb = mes.n_Hmoy
 
         # Partage le cycle en deux
-        milieu = np.floor(self.H.size / 2)
+        milieu = np.int(np.floor(self.H.size / 2))
 
         # Transverse
-        Mt_moy = np.mean(np.concatenate((self.Mt_corr[:nb], self.Mt_corr[-nb:], self.Mt_corr[milieu - nb : milieu + nb])))
+        Mt_moy = np.mean(
+            np.concatenate((
+                self.Mt_corr[:nb],
+                self.Mt_corr[-nb:],
+                self.Mt_corr[milieu - nb:milieu + nb]
+            ))
+        )
 
         # Longitudinal
         Ml_max = np.mean(np.concatenate((self.Ml_corr[:nb], self.Ml_corr[-nb:])))
@@ -468,15 +474,17 @@ class Cycle(object):
             # si changement de signe le Ml -> champ coercitif
             if (Ml[i] > 0) != signe_Ml:
                 signe_Ml = not signe_Ml
-                self.H_coer[signe_Ml] = H[i-1] - (H[i] - H[i-1])/(Ml[i] - Ml[i-1]) * Ml[i-1]
+                self.H_coer[int(signe_Ml)] = H[i-1] \
+                    - (H[i] - H[i-1])/(Ml[i] - Ml[i-1]) * Ml[i-1]
 
             # si le champ change de signe -> aimantation rémanente
             if (H[i] > 0) != signe_H:
                 signe_H = not signe_H
-                self.Mr[signe_H] = Ml[i-1] - (Ml[i] - Ml[i-1])/(H[i] - H[i-1]) * H[i-1]
+                self.Mr[int(signe_H)] = Ml[i-1] \
+                    - (Ml[i] - Ml[i-1])/(H[i] - H[i-1]) * H[i-1]
 
         # Calcul du maximum, aller retour (doit être symétrique)
-        demi = H.size / 2
+        demi = int(H.size / 2)
         self.Mt_max[0] = np.amax(np.absolute(Mt[:demi]))
         self.Mt_max[1] = np.amax(np.absolute(Mt[demi:]))
 

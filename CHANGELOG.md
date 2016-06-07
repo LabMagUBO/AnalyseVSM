@@ -7,6 +7,7 @@
 
 - Improve speed.
 - Added element like Hc, He, ... in exported 'rotation.dat'.
+- Corrected : deprecated non-integer index in Numpy array 
 
 **Fixed bugs:**
 
