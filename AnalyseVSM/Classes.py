@@ -31,6 +31,7 @@ import re           # for regular expression
 import numpy as np
 from matplotlib import pylab as pl
 from scipy import stats
+from scipy import optimize
 
 # Pour les logs
 from AnalyseVSM.logger import *
@@ -79,6 +80,8 @@ class Mesures(object):
         self.do_slope = True
         # Centrage de Ml et Mt.
         self.do_center = True
+        # Effectue un fit
+        self.do_fit = False
 
         # ###################
         # Varibles / Constantes
@@ -265,6 +268,10 @@ class Mesures(object):
         # Calcul des champs coercitifs et autres caractéristiques
         c.calc_properties()
 
+        # Fit avec fonction de Langevin
+        if self.do_fit:
+            c.fit_Langevin()
+
         # Tracé du cycle
         filename = os.path.basename(os.path.splitext(filepath)[0])    #juste le nom, sans l'extention
         file_plot = "{0}/{1}.pdf".format(self.dos_plot, filename)
@@ -287,6 +294,7 @@ class Mesures(object):
         liste = os.listdir(self.dos_cycles)
 
         rot = Rotation(self)
+        rot.fit = self.do_fit
 
         # On effectue un itération sur les fichiers
         for i, file in enumerate(liste):
@@ -359,6 +367,9 @@ class Cycle(object):
 
         # TeX check
         self.tex = mes.tex
+
+        # Fit Check
+        self.fit = False
 
     def set_unit(self, unit):
         """
@@ -488,6 +499,45 @@ class Cycle(object):
         self.Mt_max[0] = np.amax(np.absolute(Mt[:demi]))
         self.Mt_max[1] = np.amax(np.absolute(Mt[demi:]))
 
+    langevin = lambda self, x: 1/np.tanh(x) - 1 / x
+
+    def f_lan(self, x, M, a, b):
+        #return M * self.langevin(a * x + b)
+        return M * np.tanh(a * (x - b))
+
+    def fit_Langevin(self):
+        """
+            Réalise un fit de l'aimantation transverse avec la fonction de
+            langevin. Le fit est réalisé sur les data corrigés.
+        """
+        # Fit flag
+        self.fit = True
+
+        # On copie les tableaux pour plus de clarté
+        H = self.H_corr
+        Ml = self.Ml_corr
+
+        # Recherche du milieu du cycle
+        if H[0] > 0:
+            N = np.argmin(H)
+        else:
+            N = np.argmax(H)
+
+        # Tableau stockant les paramètres de fit
+        self.param_fit = np.empty(2, dtype='object')
+
+        # Boucle sur les branches
+        guess = np.array([self.Ms, 1, self.H_coer[0]])
+        self.param_fit[0], pcov = optimize.curve_fit(
+            self.f_lan, H[:N], Ml[:N],
+            p0=guess
+        )
+        guess = np.array([self.Ms, 1, self.H_coer[1]])
+        self.param_fit[1], pcov = optimize.curve_fit(
+            self.f_lan, H[N:], Ml[N:],
+            p0=guess
+        )
+
     def plot(self, file):
         """
             Trace et export le cycle Mt(H) et Ml(H)
@@ -537,6 +587,9 @@ $H_e$ = {} Oe""".format(Hc, He)
 
         ax.set_xlim(self.H_min, self.H_max)
 
+        #######
+        # 3e graphe
+        #######
         ax = fig.add_subplot(223)
         ax.grid(True)
         # Renseignements
@@ -555,6 +608,34 @@ $H_e$ = {} Oe""".format(Hc, He)
             texte = r"""$H_c$ = {} Oe
 $H_e$ = {} Oe""".format(Hc, He)
 
+        # Trace les fits si besoin
+        if self.fit:
+            # Vecteur H
+            x = np.linspace(np.amin(self.H_corr), np.amax(self.H_corr), 100)
+
+            for i in [0, 1]:    # Boucle sur les branches
+                # Extraction des paramètres
+                M, a, b = self.param_fit[i]
+
+                # On trace
+                ax.plot(
+                    x,
+                    self.f_lan(x, M, a, b),
+                    '-m'
+                )
+
+            # Extraction des paramètres de fit
+            Hcg_fit = self.param_fit[0][2]
+            Hcd_fit = self.param_fit[1][2]
+            Hc_fit = round((Hcd_fit - Hcg_fit) / 2, 2)
+            He_fit = round((Hcd_fit + Hcg_fit) / 2, 2)
+
+            # Ajout du texte sur la légende
+            texte += r"""
+$H_c^L$ = {} Oe
+$H_e^L$ = {} Oe""".format(Hc_fit, He_fit)
+
+        # Affiche le texte
         ax.text(
             x_text,
             y_text,
@@ -562,6 +643,7 @@ $H_e$ = {} Oe""".format(Hc, He)
             style='italic',
             bbox={'facecolor': 'white', 'alpha': 1, 'pad': 10}
         )
+
 
         ax = fig.add_subplot(224)
         ax.grid(True)
@@ -610,16 +692,25 @@ class Rotation(object):
 
         # On crée le tableau de résultats (vide, on le remplira au fur et à mesure)
         # tableau : phi, Hc1, Hc2, Ms, Mr1, Mr2, Mt1, Mt2, ancien phi
-        self.tab = np.empty((0, 13), float)
+        self.tab = np.empty((0, 15), float)
 
         self.file_export = "{0}/{1}.dat".format(mes.dos_export, mes.file_rot)
         self.file_plot = "{0}/{1}.pdf".format(mes.dos_plot, mes.file_rot)
 
     def add_cycle(self, cycle, phi, phi_ref):
         """
-            Ajoute les paramètres du cycle en argument au tableau, selon l'angle donné.
+            Ajoute les paramètres du cycle en argument au tableau, selon
+            l'angle donné.
         """
         # On retient les données
+        # Dont celles de fit
+        if self.fit:
+            Hcg_fit = cycle.param_fit[0][2]
+            Hcd_fit = cycle.param_fit[1][2]
+        else:
+            Hcg_fit = 0
+            Hcd_fit = 0
+
         parameters = np.array([[
             phi - phi_ref,
             cycle.H_coer[0],
@@ -634,6 +725,8 @@ class Rotation(object):
             (cycle.H_coer[1] + cycle.H_coer[0]) / 2,
             (np.abs(cycle.Mr[0]) + np.abs(cycle.Mr[1])) / 2 / cycle.Ms,
             (np.abs(cycle.Mt_max[0]) + np.abs(cycle.Mt_max[1])) / 2 / cycle.Ms,
+            Hcg_fit,
+            Hcd_fit
         ]])
         self.tab = np.append(self.tab, parameters, axis=0)
 
@@ -684,6 +777,11 @@ moy(Mt/Ms)
             np.abs((data[:, 1] - data[:, 2]) / 2),
             'ro-', label=r'$H_\mathrm{c}$ (Oe)'
         )
+        if self.fit:
+            coer.plot(
+                np.radians(data[:, 0]), np.abs((data[:, 14] - data[:, 13])/2),
+                'ms-', label=r'$H_\mathrm{c}$ fit (Oe)'
+            )
         coer.legend()
 
         # Tracé de He
@@ -693,6 +791,11 @@ moy(Mt/Ms)
             np.radians(data[:, 0]), np.abs((data[:, 1]+data[:, 2])/2),
             'bo-', label=r'$H_\mathrm{e}$ (Oe)'
         )
+        if self.fit:
+            ex.plot(
+                np.radians(data[:, 0]), np.abs((data[:, 13]+data[:, 14])/2),
+                'ms-', label=r'$H_\mathrm{e}$ fit (Oe)'
+            )
         ex.legend()
 
         # Tracé de abs(max(Mt[i])) et abs(min(Mt[i)]))

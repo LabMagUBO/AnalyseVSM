@@ -56,9 +56,11 @@ scpy.do_slope = True
 # Centrage de Ml et Mt.
 scpy.do_center = True
 
+# Fit Langevin/tanh
+scpy.do_fit = False
 
 ####################
-# Varibles / Constantes
+# Variables / Constantes
 ####################
 # Permet de tracer la rotation. L'analyse prend alors en compte les angles selon le prefix et le suffix, et n'analyse pas les autres fichiers.
 # ex : fichier_001deg_n1.dat

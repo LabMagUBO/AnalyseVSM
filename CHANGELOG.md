@@ -4,12 +4,13 @@
 [Full Changelog](https://github.com/skywinder/github-changelog-generator/compare/1.10.0...1.10.1)
 
 **Improvements:**
-
 - Improve speed.
 - Added element like Hc, He, ... in exported 'rotation.dat'.
-- Corrected : deprecated non-integer index in Numpy array 
+- Fit cycle branches using tanh/langevin function
+
 
 **Fixed bugs:**
+- Deprecated non-integer index in Numpy array
 
 
 ## [0.2](https://github.com/LabMagUBO/AnalyseVSM) (2016-03-15)
